@@ -110,21 +110,14 @@ serve(async (req) => {
 async function handleCheckoutCompleted(supabase, stripe, session) {
     try {
         const userId = session?.metadata?.user_id;
-        const planId = session?.metadata?.plan_id;
         const billingInterval = session?.metadata?.billing_interval;
 
         if (session?.mode === 'subscription' && session?.subscription) {
             // Get subscription details from Stripe
             const subscription = await stripe?.subscriptions?.retrieve(session?.subscription);
-            
-            // Get plan details
-            const { data: plan } = await supabase?.from('subscription_plans')?.select('*')?.eq('id', planId)?.single();
-
-            if (plan) {
-                // Create or update subscription record
+            // Create or update subscription record
                 const { error: subError } = await supabase?.from('user_subscriptions')?.upsert({
                         user_id: userId,
-                        plan_id: planId,
                         stripe_subscription_id: subscription?.id,
                         stripe_customer_id: session?.customer,
                         status: 'active',
@@ -137,20 +130,24 @@ async function handleCheckoutCompleted(supabase, stripe, session) {
 
                 if (subError) {
                     console.error('Error upserting subscription:', subError);
-                    return;
                 }
 
-                // Grant API credits to user
-                const credits = billingInterval === 'yearly' 
-                    ? plan?.api_credits_yearly 
-                    : plan?.api_credits_monthly;
+            // Grant plan credits based on price
+            const priceId = subscription?.items?.data?.[0]?.price?.id as string | undefined;
+            const credits = creditsForPriceId(priceId);
+            if (credits > 0 && userId) {
+                await supabase.rpc('adjust_credits', { p_user_id: userId, p_delta: credits, p_reason: 'plan_grant' });
+            }
+        }
 
-                await supabase?.from('user_profiles')?.update({
-                        current_api_credits: credits,
-                        stripe_customer_id: session?.customer
-                    })?.eq('id', userId);
-
-                console.log(`Subscription activated for user ${userId} with ${credits} credits`);
+        // One-time top-ups via Checkout (payment mode)
+        if (session?.mode === 'payment') {
+            // Fetch line items to identify price IDs
+            const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 });
+            const priceId = lineItems?.data?.[0]?.price?.id as string | undefined;
+            const credits = creditsForPriceId(priceId);
+            if (credits > 0 && userId) {
+                await supabase.rpc('adjust_credits', { p_user_id: userId, p_delta: credits, p_reason: 'topup' });
             }
         }
     } catch (error) {
@@ -240,6 +237,17 @@ async function handlePaymentSucceeded(supabase, invoice) {
                 });
         }
 
+        // For subscription renewals, grant monthly plan credits
+        if (invoice?.subscription && invoice?.billing_reason === 'subscription_cycle') {
+            // Find the price from the invoice lines
+            const invoiceLine = invoice?.lines?.data?.[0];
+            const priceId = invoiceLine?.price?.id as string | undefined;
+            const credits = creditsForPriceId(priceId);
+            if (credits > 0 && subscription?.user_id) {
+                await supabase.rpc('adjust_credits', { p_user_id: subscription.user_id, p_delta: credits, p_reason: 'plan_renewal' });
+            }
+        }
+
     } catch (error) {
         console.error('Error handling payment succeeded:', error);
     }
@@ -269,4 +277,19 @@ async function handlePaymentFailed(supabase, invoice) {
     } catch (error) {
         console.error('Error handling payment failed:', error);
     }
+}
+
+// Map Stripe price IDs from env to credit amounts
+function creditsForPriceId(priceId?: string): number {
+    if (!priceId) return 0;
+    const map: Record<string, number> = {};
+    const basic = Deno?.env?.get('STRIPE_PRICE_BASIC');
+    const pro = Deno?.env?.get('STRIPE_PRICE_PRO');
+    const max = Deno?.env?.get('STRIPE_PRICE_MAX');
+    const topup = Deno?.env?.get('STRIPE_PRICE_TOPUP_100');
+    if (basic) map[basic] = 100;
+    if (pro) map[pro] = 250;
+    if (max) map[max] = 500;
+    if (topup) map[topup] = 100;
+    return map[priceId] || 0;
 }

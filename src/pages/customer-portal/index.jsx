@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/AppIcon';
 import AccountOverview from './components/AccountOverview';
 import SubscriptionCard from './components/SubscriptionCard';
-import BillingHistory from './components/BillingHistory';
-import PaymentMethods from './components/PaymentMethods';
+// Billing section removed per requirements
 import UsageTracking from './components/UsageTracking';
 import NotificationSettings from './components/NotificationSettings';
 import SupportWidget from './components/SupportWidget';
@@ -160,19 +159,31 @@ const CustomerPortal = () => {
     setActiveTab(tab);
   };
 
-  const handleUpgradePlan = () => {
-    console.log('Upgrade plan clicked');
-    // Implement plan upgrade logic
+  const handleUpgradePlan = async () => {
+    // Open Stripe customer portal for plan management
+    const token = (await import('../../lib/supabase')).supabase.auth.getSession().then(r => r.data.session?.access_token);
+    const t = await token;
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-customer-portal`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${t}` }
+    });
+    const data = await res.json();
+    if (data?.url) window.location.href = data.url;
   };
 
-  const handleDowngradePlan = () => {
-    console.log('Downgrade plan clicked');
-    // Implement plan downgrade logic
-  };
+  const handleDowngradePlan = () => handleUpgradePlan();
 
-  const handleCancelSubscription = () => {
-    console.log('Cancel subscription clicked');
-    // Implement subscription cancellation logic
+  const handleCancelSubscription = () => handleUpgradePlan();
+  const handleBuyTopup = async () => {
+    const token = (await import('../../lib/supabase')).supabase.auth.getSession().then(r => r.data.session?.access_token);
+    const t = await token;
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId: import.meta.env.VITE_STRIPE_PRICE_TOPUP_100, mode: 'payment' })
+    });
+    const data = await res.json();
+    if (data?.url) window.location.href = data.url;
   };
 
   const handleAddPaymentMethod = () => {
@@ -257,29 +268,16 @@ const CustomerPortal = () => {
               onDowngrade={handleDowngradePlan}
               onCancel={handleCancelSubscription}
             />
+            <div className="flex justify-end">
+              <button onClick={handleBuyTopup} className="bg-primary text-white px-4 py-2 rounded-md">Buy 100 credits ($19.99)</button>
+            </div>
             <UsageTracking
               usage={customerData?.usage}
               subscription={customerData?.subscription}
             />
           </div>
         );
-      case 'billing':
-        return (
-          <div className="space-y-6">
-            <BillingHistory
-              invoices={customerData?.invoices}
-              formatCurrency={formatCurrency}
-              formatDate={formatDate}
-              onDownload={handleDownloadInvoice}
-              onDispute={handleDisputeInvoice}
-            />
-            <PaymentMethods
-              paymentMethods={customerData?.paymentMethods}
-              onAdd={handleAddPaymentMethod}
-              onRemove={handleRemovePaymentMethod}
-            />
-          </div>
-        );
+      // billing tab removed
       case 'settings':
         return (
           <div className="space-y-6">
@@ -333,7 +331,7 @@ const CustomerPortal = () => {
           {renderTabContent()}
         </div>
       </main>
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation - only Overview and Settings */}
       <BottomNavigation
         activeTab={activeTab}
         onTabChange={handleTabChange}

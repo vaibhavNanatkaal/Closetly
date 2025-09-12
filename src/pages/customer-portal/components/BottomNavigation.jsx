@@ -10,11 +10,6 @@ const BottomNavigation = ({ activeTab, onTabChange }) => {
       icon: 'Home'
     },
     {
-      id: 'billing',
-      label: 'Billing',
-      icon: 'CreditCard'
-    },
-    {
       id: 'settings',
       label: 'Settings',
       icon: 'Settings'

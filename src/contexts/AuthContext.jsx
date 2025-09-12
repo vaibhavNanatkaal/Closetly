@@ -93,55 +93,28 @@ export const AuthProvider = ({ children }) => {
     return () => subscription?.unsubscribe();
   }, [fetchUserProfile]);
 
-  // Sign up with email and password
-  const signUp = async (email, password, userData = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error } = await supabase?.auth?.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: userData?.fullName || '',
-            ...userData
-          }
+  // On first login, grant welcome credits if user has no credits row
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!user?.id) return;
+        const { data: credits, error: creditsErr } = await supabase
+          .from('user_credits')
+          .select('balance')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (creditsErr || !credits) {
+          await supabase.rpc('grant_welcome_credits', { p_user_id: user.id });
         }
-      });
+      } catch (e) {
+        // non-fatal
+      }
+    })();
+  }, [user?.id]);
 
-      if (error) throw error;
-
-      return { data, error: null };
-    } catch (error) {
-      setError(error?.message);
-      return { data: null, error };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Sign in with email and password
-  const signIn = async (email, password) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error } = await supabase?.auth?.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
-
-      return { data, error: null };
-    } catch (error) {
-      setError(error?.message);
-      return { data: null, error };
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Disable email/password flows (Google-only)
+  const signUp = async () => ({ data: null, error: new Error('Sign up is Google-only') });
+  const signIn = async () => ({ data: null, error: new Error('Sign in is Google-only') });
 
   // Sign in with Google OAuth
   const signInWithGoogle = async () => {
@@ -152,7 +125,7 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await supabase?.auth?.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location?.origin}/dashboard`
+          redirectTo: `${window.location?.origin}/customer-portal`
         }
       });
 

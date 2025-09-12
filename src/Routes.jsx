@@ -9,12 +9,7 @@ const LoginRegistration = React.lazy(() => import("./pages/login-registration"))
 const AIFashionGenerationStudio = React.lazy(() => import("./pages/ai-fashion-generation-studio"));
 const PrivacyPolicyTermsOfService = React.lazy(() => import("./pages/privacy-policy-terms-of-service"));
 const CustomerPortal = React.lazy(() => import("./pages/customer-portal"));
-const InvoiceManagement = React.lazy(() => import("./pages/invoice-management"));
-const UsageAnalyticsReporting = React.lazy(() => import("./pages/usage-analytics-reporting"));
 const BillingDashboard = React.lazy(() => import("./pages/billing-dashboard"));
-const SubscriptionManagement = React.lazy(() => import("./pages/subscription-management"));
-const DunningManagement = React.lazy(() => import("./pages/dunning-management"));
-const PaymentGatewayConfiguration = React.lazy(() => import("./pages/payment-gateway-configuration"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 // Loading component with fashion styling
@@ -48,12 +43,7 @@ const Routes = () => {
             <Route path="/customer-portal" element={<CustomerPortal />} />
             
             {/* Business Management */}
-            <Route path="/invoice-management" element={<InvoiceManagement />} />
-            <Route path="/usage-analytics-reporting" element={<UsageAnalyticsReporting />} />
             <Route path="/billing-dashboard" element={<BillingDashboard />} />
-            <Route path="/subscription-management" element={<SubscriptionManagement />} />
-            <Route path="/dunning-management" element={<DunningManagement />} />
-            <Route path="/payment-gateway-configuration" element={<PaymentGatewayConfiguration />} />
             
             {/* 404 Not Found */}
             <Route path="*" element={<NotFound />} />

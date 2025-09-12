@@ -1,5 +1,6 @@
 // src/pages/billing-dashboard/index.jsx
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Header from '../../components/ui/Header';
@@ -18,36 +19,38 @@ const BillingDashboard = () => {
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
   const [selectedSegment, setSelectedSegment] = useState('all');
 
-  // Mock data for dashboard metrics
-  const dashboardMetrics = {
-    mrr: {
-      current: 125000,
-      previous: 118000,
-      growth: 5.9,
-      currency: 'USD'
-    },
-    arr: {
-      current: 1500000,
-      previous: 1416000,
-      growth: 5.9,
-      currency: 'USD'
-    },
-    activeSubscriptions: {
-      current: 1247,
-      previous: 1189,
-      growth: 4.9
-    },
-    churnRate: {
-      current: 2.3,
-      previous: 2.8,
-      growth: -17.9
-    },
-    pendingInvoices: {
-      current: 23,
-      amount: 45600,
-      currency: 'USD'
-    }
-  };
+  const [dashboardMetrics, setDashboardMetrics] = useState({
+    mrr: { current: 0, previous: 0, growth: 0, currency: 'USD' },
+    arr: { current: 0, previous: 0, growth: 0, currency: 'USD' },
+    activeSubscriptions: { current: 0, previous: 0, growth: 0 },
+    churnRate: { current: 0, previous: 0, growth: 0 },
+    pendingInvoices: { current: 0, amount: 0, currency: 'USD' },
+    totalCreditsUsed: 0,
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-metrics`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const data = await res.json();
+        const mrr = Number(data?.mrr || 0);
+        const activeUsers = Number(data?.activeUsers || 0);
+        const totalCreditsUsed = Number(data?.totalCreditsUsed || 0);
+        setDashboardMetrics((prev) => ({
+          ...prev,
+          mrr: { ...prev.mrr, current: mrr },
+          arr: { ...prev.arr, current: mrr * 12 },
+          activeSubscriptions: { ...prev.activeSubscriptions, current: activeUsers },
+          totalCreditsUsed,
+        }));
+      } catch (e) {
+        // noop
+      }
+    })();
+  }, []);
 
   // Mock revenue trend data
   const revenueData = [
@@ -233,10 +236,17 @@ const BillingDashboard = () => {
               trend="up"
             />
             <MetricsCard
-              title="Active Subscriptions"
+              title="Active Users"
               value={dashboardMetrics?.activeSubscriptions?.current?.toLocaleString()}
               change={dashboardMetrics?.activeSubscriptions?.growth}
               icon="Users"
+              trend="up"
+            />
+            <MetricsCard
+              title="Total Credits Used"
+              value={dashboardMetrics?.totalCreditsUsed?.toLocaleString()}
+              change={0}
+              icon="BatteryCharging"
               trend="up"
             />
             <MetricsCard

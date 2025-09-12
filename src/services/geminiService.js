@@ -1,4 +1,5 @@
 import genAI from '../utils/geminiClient';
+import { supabase } from 'src/lib/supabase';
 
 /**
  * ENHANCED GEMINI SERVICE WITH ACTUAL IMAGE GENERATION
@@ -22,7 +23,7 @@ import genAI from '../utils/geminiClient';
  * @param {Object} options - Generation options
  * @returns {Promise<Object>} Generated fashion analysis with Gemini AI
  */
-export async function generateFashionImage(userPhoto, fashionDescription, options = {}) {
+export async function generateFashionImage(userPhoto, fashionDescription, options = {}, session = null) {
   try {
     const { style = 'realistic', creativity = 0.7, generationType = 'overlay' } = options;
     
@@ -35,6 +36,18 @@ export async function generateFashionImage(userPhoto, fashionDescription, option
         isPlaceholder: apiKey === 'your-gemini-api-key-here'
       });
       throw new Error('Invalid or missing Gemini API key. Please check your VITE_GEMINI_API_KEY environment variable.');
+    }
+
+    // Ensure user has credits before generation
+    if (session?.user?.id) {
+      const { data: creditRow, error: creditErr } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+      if (creditErr || !creditRow || creditRow.balance <= 0) {
+        throw new Error('You have no credits left. Please upgrade or top up.');
+      }
     }
 
     // Enhanced model initialization with error handling
@@ -124,7 +137,7 @@ export async function generateFashionImage(userPhoto, fashionDescription, option
       }
 
       // Generate actual fashion analysis with Gemini AI
-      return {
+      const resultObject = {
         type: 'wardrobe_overlay',
         imageData: await generatePlaceholderImageData(), // Visual placeholder
         mimeType: 'image/png',
@@ -138,6 +151,13 @@ export async function generateFashionImage(userPhoto, fashionDescription, option
         generationType: generationType,
         geminiGenerated: true
       };
+
+      // Deduct one credit after successful generation
+      if (session?.user?.id) {
+        await supabase.rpc('adjust_credits', { p_user_id: session.user.id, p_delta: -1, p_reason: 'ai_gen' });
+      }
+
+      return resultObject;
     }
 
     // For standalone generation without user photo with enhanced error handling
@@ -155,7 +175,7 @@ export async function generateFashionImage(userPhoto, fashionDescription, option
       throw new Error(`AI generation failed: ${apiError?.message || 'Please try again'}`);
     }
 
-    return {
+    const resultObject = {
       type: 'fashion_generation',
       description: description,
       analysis: description, // Actual Gemini analysis
@@ -167,6 +187,11 @@ export async function generateFashionImage(userPhoto, fashionDescription, option
       generationType: generationType,
       geminiGenerated: true
     };
+
+    if (session?.user?.id) {
+      await supabase.rpc('adjust_credits', { p_user_id: session.user.id, p_delta: -1, p_reason: 'ai_gen' });
+    }
+    return resultObject;
 
   } catch (error) {
     console.error('Error generating fashion image with Gemini:', error);

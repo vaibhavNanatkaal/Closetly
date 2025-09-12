@@ -32,7 +32,7 @@ serve(async (req) => {
         });
 
         if (req?.method === 'POST') {
-            const { planId, billingInterval = 'monthly' } = await req?.json();
+            const { priceId, mode = 'subscription' } = await req?.json();
             
             // Get JWT from Authorization header
             const authHeader = req?.headers?.get('Authorization');
@@ -55,13 +55,6 @@ serve(async (req) => {
                 throw new Error('User profile not found');
             }
 
-            // Get subscription plan details
-            const { data: plan, error: planError } = await supabase?.from('subscription_plans')?.select('*')?.eq('id', planId)?.eq('is_active', true)?.single();
-
-            if (planError || !plan) {
-                throw new Error('Subscription plan not found');
-            }
-
             // Create or get Stripe customer
             let stripeCustomerId = userProfile?.stripe_customer_id;
             
@@ -80,53 +73,19 @@ serve(async (req) => {
                 await supabase?.from('user_profiles')?.update({ stripe_customer_id: stripeCustomerId })?.eq('id', user?.id);
             }
 
-            // Determine price based on billing interval
-            const unitAmount = billingInterval === 'yearly' 
-                ? Math.round(plan?.price_yearly * 100)
-                : Math.round(plan?.price_monthly * 100);
-
-            const credits = billingInterval === 'yearly'
-                ? plan?.api_credits_yearly
-                : plan?.api_credits_monthly;
-
-            // Create Stripe checkout session
+            // Create Stripe checkout session using direct price ID
             const session = await stripe?.checkout?.sessions?.create({
                 customer: stripeCustomerId,
                 payment_method_types: ['card'],
-                mode: 'subscription',
-                line_items: [{
-                    price_data: {
-                        currency: 'usd',
-                        product_data: {
-                            name: `${plan?.name} Plan`,
-                            description: `${plan?.description} - ${credits} API credits ${billingInterval}`,
-                            metadata: {
-                                plan_id: planId,
-                                billing_interval: billingInterval,
-                                credits_included: credits?.toString()
-                            }
-                        },
-                        unit_amount: unitAmount,
-                        recurring: {
-                            interval: billingInterval === 'yearly' ? 'year' : 'month'
-                        }
-                    },
-                    quantity: 1,
-                }],
+                mode,
+                line_items: [{ price: priceId, quantity: 1 }],
                 success_url: `${req?.headers?.get('origin')}/customer-portal?success=true&session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${req?.headers?.get('origin')}/subscription-management?canceled=true`,
                 metadata: {
                     user_id: user?.id,
-                    plan_id: planId,
-                    billing_interval: billingInterval
+                    mode
                 },
-                subscription_data: {
-                    metadata: {
-                        user_id: user?.id,
-                        plan_id: planId,
-                        billing_interval: billingInterval
-                    }
-                },
+                subscription_data: mode === 'subscription' ? { metadata: { user_id: user?.id } } : undefined,
                 customer_update: {
                     name: 'auto',
                     address: 'auto'
