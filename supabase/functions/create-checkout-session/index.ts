@@ -48,29 +48,28 @@ serve(async (req) => {
                 throw new Error('Invalid authentication');
             }
 
-            // Get user profile with Stripe customer ID
-            const { data: userProfile, error: profileError } = await supabase?.from('user_profiles')?.select('*')?.eq('id', user?.id)?.single();
-
-            if (profileError) {
-                throw new Error('User profile not found');
-            }
-
-            // Create or get Stripe customer
-            let stripeCustomerId = userProfile?.stripe_customer_id;
+            // Create or get Stripe customer using auth.users data
+            let stripeCustomerId = null;
             
-            if (!stripeCustomerId) {
+            // Try to find existing customer by email
+            const existingCustomers = await stripe?.customers?.list({
+                email: user?.email,
+                limit: 1
+            });
+            
+            if (existingCustomers?.data?.length > 0) {
+                stripeCustomerId = existingCustomers.data[0].id;
+            } else {
+                // Create new Stripe customer
                 const customer = await stripe?.customers?.create({
-                    email: userProfile?.email,
-                    name: userProfile?.full_name,
+                    email: user?.email,
+                    name: user?.user_metadata?.full_name || user?.email,
                     metadata: {
                         supabase_user_id: user?.id
                     }
                 });
                 
                 stripeCustomerId = customer?.id;
-                
-                // Update user profile with Stripe customer ID
-                await supabase?.from('user_profiles')?.update({ stripe_customer_id: stripeCustomerId })?.eq('id', user?.id);
             }
 
             // Create Stripe checkout session using direct price ID
@@ -80,7 +79,7 @@ serve(async (req) => {
                 mode,
                 line_items: [{ price: priceId, quantity: 1 }],
                 success_url: `${req?.headers?.get('origin')}/customer-portal?success=true&session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${req?.headers?.get('origin')}/subscription-management?canceled=true`,
+                cancel_url: `${req?.headers?.get('origin')}/customer-portal?canceled=true`,
                 metadata: {
                     user_id: user?.id,
                     mode

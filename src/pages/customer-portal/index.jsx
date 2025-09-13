@@ -160,30 +160,85 @@ const CustomerPortal = () => {
   };
 
   const handleUpgradePlan = async () => {
-    // Open Stripe customer portal for plan management
-    const token = (await import('../../lib/supabase')).supabase.auth.getSession().then(r => r.data.session?.access_token);
-    const t = await token;
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-customer-portal`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${t}` }
-    });
-    const data = await res.json();
-    if (data?.url) window.location.href = data.url;
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.error('No active session');
+        return;
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-customer-portal`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${session.access_token}`, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ returnUrl: window.location.href })
+      });
+      
+      const data = await res.json();
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Error opening customer portal:', error);
+    }
   };
 
   const handleDowngradePlan = () => handleUpgradePlan();
 
   const handleCancelSubscription = () => handleUpgradePlan();
   const handleBuyTopup = async () => {
-    const token = (await import('../../lib/supabase')).supabase.auth.getSession().then(r => r.data.session?.access_token);
-    const t = await token;
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priceId: import.meta.env.VITE_STRIPE_PRICE_TOPUP_100, mode: 'payment' })
-    });
-    const data = await res.json();
-    if (data?.url) window.location.href = data.url;
+    try {
+      console.log('Buy credits button clicked');
+      const { supabase } = await import('../../lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.error('No active session');
+        alert('Please log in to buy credits');
+        return;
+      }
+
+      console.log('Creating checkout session for user:', session.user.id);
+      console.log('Price ID:', import.meta.env.VITE_STRIPE_PRICE_TOPUP_100);
+      
+      if (!import.meta.env.VITE_STRIPE_PRICE_TOPUP_100) {
+        alert('Error: Stripe price ID not configured. Please contact support.');
+        return;
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${session.access_token}`, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ 
+          priceId: import.meta.env.VITE_STRIPE_PRICE_TOPUP_100, 
+          mode: 'payment',
+          userId: session.user.id
+        })
+      });
+      
+      console.log('Response status:', res.status);
+      const data = await res.json();
+      console.log('Response data:', data);
+      
+      if (res.ok && data?.url) {
+        console.log('Redirecting to:', data.url);
+        window.location.href = data.url;
+      } else {
+        console.error('Error response:', data);
+        const errorMessage = data?.error || data?.message || 'Failed to create checkout session';
+        alert(`Error: ${errorMessage}. Please check the console for details.`);
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      alert('Error: ' + error.message);
+    }
   };
 
   const handleAddPaymentMethod = () => {
@@ -268,8 +323,14 @@ const CustomerPortal = () => {
               onDowngrade={handleDowngradePlan}
               onCancel={handleCancelSubscription}
             />
-            <div className="flex justify-end">
-              <button onClick={handleBuyTopup} className="bg-primary text-white px-4 py-2 rounded-md">Buy 100 credits ($19.99)</button>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={handleUpgradePlan} 
+                className="bg-secondary text-white px-4 py-2 rounded-md hover:bg-secondary-600 transition-colors"
+              >
+                Manage Subscription
+              </button>
+              <button onClick={handleBuyTopup} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-600 transition-colors">Buy 100 credits ($19.99)</button>
             </div>
             <UsageTracking
               usage={customerData?.usage}

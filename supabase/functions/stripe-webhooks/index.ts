@@ -29,7 +29,7 @@ serve(async (req) => {
         const stripeKey = Deno?.env?.get('STRIPE_SECRET_KEY');
         const webhookSecret = Deno?.env?.get('STRIPE_WEBHOOK_SECRET');
         const stripe = new Stripe(stripeKey, {
-            apiVersion: '2023-10-16',
+            apiVersion: '2024-06-20',
         });
 
         if (req?.method === 'POST') {

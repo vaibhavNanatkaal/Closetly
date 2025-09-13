@@ -6,7 +6,7 @@ const NotFound = () => {
   const navigate = useNavigate();
 
   const handleGoHome = () => {
-    navigate('/billing-dashboard');
+    navigate('/customer-portal');
   };
 
   const handleGoBack = () => {
@@ -35,7 +35,7 @@ const NotFound = () => {
             className="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 flex items-center justify-center space-x-2"
           >
             <Icon name="Home" size={20} />
-            <span>Go to Dashboard</span>
+            <span>Go to Customer Portal</span>
           </button>
           
           <button
@@ -52,22 +52,16 @@ const NotFound = () => {
           <p className="text-sm text-text-tertiary mb-4">Need help? Try these:</p>
           <div className="flex justify-center space-x-6 text-sm">
             <button
-              onClick={() => navigate('/billing-dashboard')}
+              onClick={() => navigate('/customer-portal')}
               className="text-primary hover:text-primary-700 transition-colors duration-200"
             >
-              Dashboard
+              Customer Portal
             </button>
             <button
-              onClick={() => navigate('/subscription-management')}
+              onClick={() => navigate('/ai-fashion-generation-studio')}
               className="text-primary hover:text-primary-700 transition-colors duration-200"
             >
-              Subscriptions
-            </button>
-            <button
-              onClick={() => navigate('/invoice-management')}
-              className="text-primary hover:text-primary-700 transition-colors duration-200"
-            >
-              Invoices
+              AI Studio
             </button>
           </div>
         </div>

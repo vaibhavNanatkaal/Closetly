@@ -19,11 +19,6 @@ const PageHeader = ({
 
   // Route map to ensure consistent titles across the app
   const routeMap = {
-    '/billing-dashboard': {
-      title: 'Billing Dashboard',
-      description: 'Monitor revenue, subscriptions, and billing performance',
-      icon: 'BarChart3'
-    },
     '/subscription-management': {
       title: 'Subscription Management',
       description: 'Comprehensive lifecycle control for customer subscriptions and plan modifications',

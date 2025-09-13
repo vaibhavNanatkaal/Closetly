@@ -17,14 +17,7 @@ const Sidebar = () => {
     {
       id: 'overview',
       title: 'Overview',
-      items: [
-        {
-          label: 'Billing Dashboard',
-          path: '/billing-dashboard',
-          icon: 'BarChart3',
-          tooltip: 'Revenue insights and billing overview'
-        }
-      ]
+      items: []
     },
     {
       id: 'billing',
@@ -207,32 +200,7 @@ const Sidebar = () => {
           </div>
         </div>
       </aside>
-      {/* Bottom Tab Navigation for Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border-light z-100">
-        <div className="flex justify-around py-2">
-          {[
-            { label: 'Dashboard', path: '/billing-dashboard', icon: 'BarChart3' },
-            { label: 'Billing', path: '/subscription-management', icon: 'Users' },
-            { label: 'Analytics', path: '/usage-analytics-reporting', icon: 'TrendingUp' },
-            { label: 'More', path: '/payment-gateway-configuration', icon: 'Settings' }
-          ]?.map((item) => (
-            <button
-              key={item?.path}
-              onClick={() => handleNavigation(item?.path)}
-              className={`flex flex-col items-center py-2 px-3 rounded-lg transition-colors duration-200 ${
-                isActivePath(item?.path)
-                  ? 'text-primary bg-primary-50 font-semibold' : 'text-secondary-600 hover:text-primary'
-              }`}
-            >
-              <Icon name={item?.icon} size={20} />
-              <span className="text-xs mt-1 font-medium">{item?.label}</span>
-              {isActivePath(item?.path) && (
-                <div className="w-1 h-1 bg-primary rounded-full mt-1"></div>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Bottom Tab Navigation for Mobile - Removed */}
     </>
   );
 };

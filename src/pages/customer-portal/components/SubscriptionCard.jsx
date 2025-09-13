@@ -38,15 +38,13 @@ const SubscriptionCard = ({ subscription, formatCurrency, formatDate, onUpgrade,
     return proratedCharge - proratedCredit;
   };
 
-  const handlePlanChange = (plan) => {
+  const handlePlanChange = async (plan) => {
     setSelectedPlan(plan);
     const prorationAmount = calculateProration(plan?.price, subscription?.plan?.price);
     
-    if (plan?.price > subscription?.plan?.price) {
-      onUpgrade();
-    } else if (plan?.price < subscription?.plan?.price) {
-      onDowngrade();
-    }
+    // Always redirect to Stripe customer portal for plan changes
+    // Stripe will handle the upgrade/downgrade logic
+    onUpgrade(); // This will open the customer portal
     
     setShowPlanOptions(false);
   };
@@ -65,7 +63,7 @@ const SubscriptionCard = ({ subscription, formatCurrency, formatDate, onUpgrade,
           className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
         >
           <Icon name="RefreshCw" size={16} className="mr-2" />
-          Change Plan
+          {showPlanOptions ? 'Hide Plans' : 'View Plans'}
         </button>
       </div>
       {/* Current Plan Details */}
@@ -102,14 +100,18 @@ const SubscriptionCard = ({ subscription, formatCurrency, formatDate, onUpgrade,
       {/* Plan Options */}
       {showPlanOptions && (
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-4">Available Plans</h3>
+          <h3 className="text-lg font-semibold text-text-primary mb-2">Available Plans</h3>
+          <p className="text-sm text-text-secondary mb-4">
+            Click on any plan below to manage your subscription through Stripe's secure portal
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {planOptions?.map((plan) => (
               <div
                 key={plan?.id}
-                className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                className={`border rounded-lg p-4 transition-all ${
                   plan?.current
-                    ? 'border-primary bg-primary-50' :'border-border-light hover:border-primary hover:bg-surface-hover'
+                    ? 'border-primary bg-primary-50' 
+                    : 'border-border-light hover:border-primary hover:bg-surface-hover cursor-pointer hover:shadow-md'
                 }`}
                 onClick={() => !plan?.current && handlePlanChange(plan)}
               >
@@ -139,7 +141,7 @@ const SubscriptionCard = ({ subscription, formatCurrency, formatDate, onUpgrade,
                 {!plan?.current && (
                   <div className="mt-3">
                     <div className="text-xs text-text-secondary">
-                      {plan?.price > subscription?.plan?.price ? 'Upgrade' : 'Downgrade'} now
+                      Click to {plan?.price > subscription?.plan?.price ? 'upgrade' : 'downgrade'} via Stripe
                       {plan?.price !== subscription?.plan?.price && (
                         <span className="block font-medium text-text-primary">
                           Prorated: {formatCurrency(Math.abs(calculateProration(plan?.price, subscription?.plan?.price)))}
