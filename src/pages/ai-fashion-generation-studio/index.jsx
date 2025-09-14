@@ -86,9 +86,8 @@ const AIFashionGenerationStudio = () => {
       return;
     }
 
-    // Check subscription tier for inspiration photos
-    const currentPlan = userProfile?.user_subscriptions?.[0]?.subscription_plans?.name;
-    if (currentPlan === 'Basic') {
+    // Check if user has credits for inspiration photos (optional feature)
+    if (!hasCredits(1)) {
       setShowUpgradeModal(true);
       return;
     }
@@ -181,7 +180,22 @@ const AIFashionGenerationStudio = () => {
       
     } catch (error) {
       console.error('Generation error:', error);
-      alert(error?.message || 'Failed to generate fashion overlay');
+      
+      // Enhanced error handling with specific messages
+      let errorMessage = 'Failed to generate fashion overlay';
+      
+      if (error?.message?.includes('credits')) {
+        errorMessage = 'You have no credits left! Please upgrade your plan or purchase more credits to continue generating AI fashion content.';
+        setShowUpgradeModal(true);
+      } else if (error?.message?.includes('API')) {
+        errorMessage = 'AI service temporarily unavailable. Please try again in a few moments.';
+      } else if (error?.message?.includes('image')) {
+        errorMessage = 'There was an issue processing your image. Please try uploading a different photo.';
+      } else {
+        errorMessage = error?.message || errorMessage;
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -282,6 +296,14 @@ const AIFashionGenerationStudio = () => {
                   {userProfile?.current_api_credits || 0}
                   <span className="text-lg text-muted-foreground ml-2 font-normal">remaining</span>
                 </p>
+                {(userProfile?.current_api_credits || 0) === 0 && (
+                  <div className="flex items-center space-x-2 mt-2 px-3 py-1 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                      No credits left - upgrade to continue
+                    </span>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground mt-1">
                   Plan: <span className="font-medium text-primary">
                     {userProfile?.user_subscriptions?.[0]?.subscription_plans?.name || 'Free'}
@@ -874,7 +896,7 @@ const AIFashionGenerationStudio = () => {
           </div>
           <div className="flex space-x-2">
             <Button
-              onClick={() => window.open('/subscription', '_blank')}
+              onClick={() => window.location.href = '/customer-portal'}
               className="flex-1"
             >
               View Plans

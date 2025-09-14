@@ -54,7 +54,7 @@ serve(async (req) => {
                 });
 
             if (creditError || !canConsume) {
-                throw new Error('Insufficient API credits or inactive subscription');
+                throw new Error('Insufficient API credits or inactive subscription. Please upgrade your plan or purchase more credits to continue generating AI fashion content.');
             }
 
             const startTime = Date.now();

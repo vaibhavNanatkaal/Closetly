@@ -1,5 +1,5 @@
 import genAI from '../utils/geminiClient';
-import { supabase } from 'src/lib/supabase';
+import { supabase } from '../lib/supabase';
 
 /**
  * ENHANCED GEMINI SERVICE WITH ACTUAL IMAGE GENERATION
@@ -46,7 +46,7 @@ export async function generateFashionImage(userPhoto, fashionDescription, option
         .eq('user_id', session.user.id)
         .maybeSingle();
       if (creditErr || !creditRow || creditRow.balance <= 0) {
-        throw new Error('You have no credits left. Please upgrade or top up.');
+        throw new Error('You have no credits left. Please upgrade your plan or purchase more credits to continue generating AI fashion content.');
       }
     }
 

@@ -12,29 +12,54 @@ export const fashionService = {
         conversationalPrompt = ''
       } = options;
 
-      // Check user credits first
-      const { data: userProfile } = await supabase?.from('user_profiles')?.select('current_api_credits')?.eq('id', (await supabase?.auth?.getUser())?.data?.user?.id)?.single();
-
-      if (!userProfile || userProfile?.current_api_credits < 1) {
-        throw new Error('Insufficient API credits');
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Please log in to generate AI fashion content');
       }
 
-      // Call the AI generation edge function
-      const { data, error } = await supabase?.functions?.invoke('process-ai-generation', {
-        body: {
-          imageData,
-          styles,
-          creativityLevel,
-          maxImages,
-          inspirationImage,
-          conversationalPrompt,
-          operationType: 'fashion_analysis'
-        }
-      });
+      // Check user credits using the new credit system
+      const { data: creditData, error: creditError } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', session.user.id)
+        .single();
 
-      if (error) throw error;
+      if (creditError || !creditData || creditData.balance < 1) {
+        throw new Error('Insufficient credits. You need at least 1 credit to generate AI fashion content. Please upgrade your plan or purchase more credits.');
+      }
 
-      return data;
+      // Import and use the Gemini service for actual AI generation
+      const { generateFashionImage } = await import('./geminiService');
+      
+      // Convert imageData to File object if it's a data URL
+      let imageFile;
+      if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+        const response = await fetch(imageData);
+        const blob = await response.blob();
+        imageFile = new File([blob], 'user-photo.jpg', { type: 'image/jpeg' });
+      } else {
+        imageFile = imageData;
+      }
+
+      // Generate fashion image using Gemini
+      const result = await generateFashionImage(
+        imageFile,
+        conversationalPrompt || `Apply ${styles.join(', ')} fashion style`,
+        {
+          style: styles[0] || 'realistic',
+          creativity: creativityLevel,
+          generationType: 'overlay'
+        },
+        session
+      );
+
+      return {
+        images: [result.generatedImageUrl],
+        analysis: result.analysis,
+        styles: styles,
+        metadata: result.metadata
+      };
     } catch (error) {
       console.error('Fashion analysis error:', error);
       throw error;

@@ -23,32 +23,26 @@ export const AuthProvider = ({ children }) => {
     if (!userId) return;
     
     try {
-      const { data, error } = await supabase?.from('user_profiles')?.select(`
-          *,
-          user_subscriptions (
-            id,
-            status,
-            current_period_end,
-            cancel_at_period_end,
-            subscription_plans (
-              id,
-              name,
-              api_credits_monthly,
-              price_monthly,
-              features
-            )
-          )
-        `)?.eq('id', userId)?.single();
+      // Get user credits from the new credit system
+      const { data: creditData, error: creditError } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', userId)
+        .single();
 
-      if (error && error?.code !== 'PGRST116') {
-        console.error('Error fetching user profile:', error);
-        return;
+      if (creditError && creditError.code !== 'PGRST116') {
+        console.error('Error fetching user credits:', creditError);
       }
 
-      if (data) {
-        setUserProfile(data);
-        setSubscription(data?.user_subscriptions?.[0] || null);
-      }
+      // Create a simplified user profile with credit information
+      const userProfile = {
+        id: userId,
+        current_api_credits: creditData?.balance || 0,
+        // Add other user data as needed
+      };
+
+      setUserProfile(userProfile);
+      setSubscription(null); // No subscription system for now
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
     }
@@ -98,19 +92,58 @@ export const AuthProvider = ({ children }) => {
     (async () => {
       try {
         if (!user?.id) return;
+        
+        console.log('Checking welcome credits for user:', user.id);
+        
+        // Check if user already has credits
         const { data: credits, error: creditsErr } = await supabase
           .from('user_credits')
           .select('balance')
           .eq('user_id', user.id)
           .maybeSingle();
-        if (creditsErr || !credits) {
-          await supabase.rpc('grant_welcome_credits', { p_user_id: user.id });
+
+        console.log('Credits check result:', { credits, creditsErr });
+
+        // If no credits row exists, grant welcome credits
+        if (creditsErr && creditsErr.code === 'PGRST116') {
+          console.log('No credits row found, granting welcome credits...');
+          const { data: grantResult, error: grantError } = await supabase.rpc('grant_welcome_credits', { p_user_id: user.id });
+          
+          if (grantError) {
+            console.error('Error granting welcome credits:', grantError);
+          } else {
+            console.log('Welcome credits granted successfully:', grantResult);
+            // Show success message
+            if (typeof window !== 'undefined') {
+              // Simple alert for now - could be replaced with a toast notification
+              console.log('🎉 Welcome! You received 3 free credits to get started!');
+            }
+            // Refresh user profile to show updated credits
+            await fetchUserProfile(user.id);
+          }
+        } else if (credits && credits.balance === 0) {
+          // If user has 0 credits, also grant welcome credits
+          console.log('User has 0 credits, granting welcome credits...');
+          const { data: grantResult, error: grantError } = await supabase.rpc('grant_welcome_credits', { p_user_id: user.id });
+          
+          if (grantError) {
+            console.error('Error granting welcome credits:', grantError);
+          } else {
+            console.log('Welcome credits granted successfully:', grantResult);
+            // Show success message
+            if (typeof window !== 'undefined') {
+              console.log('🎉 Welcome! You received 3 free credits to get started!');
+            }
+            await fetchUserProfile(user.id);
+          }
+        } else {
+          console.log('User already has credits:', credits?.balance);
         }
       } catch (e) {
-        // non-fatal
+        console.error('Error in welcome credits logic:', e);
       }
     })();
-  }, [user?.id]);
+  }, [user?.id, fetchUserProfile]);
 
   // Disable email/password flows (Google-only)
   const signUp = async () => ({ data: null, error: new Error('Sign up is Google-only') });
@@ -232,6 +265,7 @@ export const AuthProvider = ({ children }) => {
   // Refresh user data
   const refreshUserData = useCallback(async () => {
     if (user?.id) {
+      console.log('Refreshing user data for:', user.id);
       await fetchUserProfile(user?.id);
     }
   }, [user?.id, fetchUserProfile]);

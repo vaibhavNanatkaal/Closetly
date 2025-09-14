@@ -32,6 +32,7 @@ const Routes = () => {
             {/* Authentication */}
             <Route path="/" element={<LoginRegistration />} />
             <Route path="/login" element={<LoginRegistration />} />
+            <Route path="/login-registration" element={<LoginRegistration />} />
             
             {/* Main Application - AI Fashion Generation Studio */}
             <Route path="/ai-fashion-generation-studio" element={<AIFashionGenerationStudio />} />

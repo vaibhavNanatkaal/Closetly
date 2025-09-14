@@ -1,7 +1,7 @@
 # Updates Summary
 
 ## Core Changes
-- Auth: Enforced Google-only sign-in; removed email/password UI. First login grants 3 credits.
+- Auth: Enforced Google-only sign-in; removed email/password UI. First login grants 3 credits to new users.
 - Credits: Added `user_credits`, `credit_ledger` and RPCs `grant_welcome_credits`, `adjust_credits`.
 - AI Generation: Deduct 1 credit per generation; error when no credits.
 - Plans/Top-ups: Stripe price→credit mapping (Basic 100, Pro 250, Max 500; Top-up 100) applied on subscription start/renewal and top-up completion.

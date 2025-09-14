@@ -1,5 +1,5 @@
 // src/pages/customer-portal/index.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/AppIcon';
 import AccountOverview from './components/AccountOverview';
@@ -19,126 +19,115 @@ const CustomerPortal = () => {
   const [locale, setLocale] = useState('en-US');
   const [currency, setCurrency] = useState('USD');
   const [showSupportChat, setShowSupportChat] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Mock customer data
-  useEffect(() => {
-    const mockCustomerData = {
+  // Load real customer data
+  const loadCustomerData = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      const { supabase } = await import('../../lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/login-registration');
+        return;
+      }
+
+      console.log('Loading customer data for user:', session.user.id);
+
+      // Get user credits
+      const { data: creditsData, error: creditsError } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', session.user.id)
+        .single();
+
+      console.log('Credits data:', creditsData);
+
+      // Get credit ledger for usage history
+      const { data: ledgerData, error: ledgerError } = await supabase
+        .from('credit_ledger')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      console.log('Ledger data:', ledgerData);
+
+        const currentCredits = creditsData?.balance || 0;
+        const totalCreditsUsed = ledgerData?.reduce((sum, entry) => 
+          entry.delta < 0 ? sum + Math.abs(entry.delta) : sum, 0) || 0;
+
+        const customerData = {
       customer: {
-        id: 'cust_12345',
-        name: 'John Doe',
-        email: 'john.doe@company.com',
-        avatar: null,
-        joinedDate: '2023-06-15',
+            id: session.user.id,
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email,
+            avatar: session.user.user_metadata?.avatar_url || null,
+            joinedDate: new Date(session.user.created_at).toISOString().split('T')[0],
         preferredLanguage: 'en-US',
         timezone: 'America/New_York'
       },
       subscription: {
-        id: 'sub_67890',
+            id: 'free_tier',
         plan: {
-          name: 'Professional',
-          price: 49.99,
+              name: 'Free Tier',
+              price: 0,
           currency: 'USD',
           interval: 'month',
           features: [
-            'Up to 10,000 API calls/month',
-            '100GB Storage',
-            '24/7 Support',
-            'Advanced Analytics'
+                '3 free credits',
+                'Basic AI generation',
+                'Community support'
           ]
         },
         status: 'active',
-        currentPeriodStart: '2024-01-01',
-        currentPeriodEnd: '2024-02-01',
-        nextBillingDate: '2024-02-01',
+            currentPeriodStart: new Date().toISOString().split('T')[0],
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            nextBillingDate: null,
         cancelAtPeriodEnd: false,
         trialEnd: null
       },
       usage: {
-        apiCalls: {
-          current: 7543,
-          limit: 10000,
-          percentage: 75.43
-        },
-        storage: {
-          current: 68.5,
-          limit: 100,
-          percentage: 68.5,
-          unit: 'GB'
-        },
-        users: {
-          current: 8,
-          limit: 15,
-          percentage: 53.33
-        }
-      },
-      paymentMethods: [
-        {
-          id: 'pm_1',
-          type: 'card',
-          brand: 'visa',
-          last4: '4242',
-          expiryMonth: 12,
-          expiryYear: 2025,
-          isDefault: true
-        },
-        {
-          id: 'pm_2',
-          type: 'card',
-          brand: 'mastercard',
-          last4: '8888',
-          expiryMonth: 8,
-          expiryYear: 2026,
-          isDefault: false
-        }
-      ],
-      invoices: [
-        {
-          id: 'inv_001',
-          number: 'INV-2024-001',
-          amount: 49.99,
-          currency: 'USD',
-          status: 'paid',
-          date: '2024-01-01',
-          dueDate: '2024-01-15',
-          pdfUrl: '/invoices/inv_001.pdf'
-        },
-        {
-          id: 'inv_002',
-          number: 'INV-2023-012',
-          amount: 49.99,
-          currency: 'USD',
-          status: 'paid',
-          date: '2023-12-01',
-          dueDate: '2023-12-15',
-          pdfUrl: '/invoices/inv_002.pdf'
-        },
-        {
-          id: 'inv_003',
-          number: 'INV-2023-011',
-          amount: 49.99,
-          currency: 'USD',
-          status: 'overdue',
-          date: '2023-11-01',
-          dueDate: '2023-11-15',
-          pdfUrl: '/invoices/inv_003.pdf'
-        }
-      ],
+            credits: {
+              current: currentCredits,
+              used: totalCreditsUsed,
+              total: currentCredits + totalCreditsUsed
+            },
+            images: {
+              generated: totalCreditsUsed,
+              remaining: currentCredits
+            }
+          },
+          paymentMethods: [], // No stored payment methods per requirements
+          invoices: [], // Will be handled by Stripe customer portal
       notifications: {
         billingReminders: true,
         usageAlerts: true,
         subscriptionChanges: true,
         marketingEmails: false,
         securityAlerts: true
-      }
-    };
+          },
+          creditHistory: ledgerData || []
+        };
 
-    setTimeout(() => {
-      setCustomerData(mockCustomerData);
-      setLocale(mockCustomerData?.customer?.preferredLanguage);
-      setCurrency(mockCustomerData?.subscription?.plan?.currency);
-      setLoading(false);
-    }, 1000);
-  }, []);
+        setCustomerData(customerData);
+        setLocale(customerData?.customer?.preferredLanguage);
+        setCurrency(customerData?.subscription?.plan?.currency);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading customer data:', error);
+        setLoading(false);
+      } finally {
+        setRefreshing(false);
+      }
+    }
+  }, [navigate]);
+
+  // Load data on component mount
+  useEffect(() => {
+    loadCustomerData();
+  }, [loadCustomerData]);
 
   const formatCurrency = (amount, currencyCode = currency) => {
     return new Intl.NumberFormat(locale, {
@@ -365,10 +354,10 @@ const CustomerPortal = () => {
         {/* Desktop Navigation - Hidden on mobile */}
         <div className="hidden lg:block bg-surface border-b border-border-light">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between">
             <nav className="flex space-x-8">
               {[
                 { id: 'overview', label: 'Overview', icon: 'Home' },
-                { id: 'billing', label: 'Billing', icon: 'CreditCard' },
                 { id: 'settings', label: 'Settings', icon: 'Settings' }
               ]?.map((tab) => (
                 <button
@@ -384,6 +373,15 @@ const CustomerPortal = () => {
                 </button>
               ))}
             </nav>
+              <button
+                onClick={loadCustomerData}
+                disabled={refreshing}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+              >
+                <Icon name={refreshing ? "Loader2" : "RefreshCw"} size={16} className={refreshing ? "animate-spin" : ""} />
+                <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
+              </button>
+            </div>
           </div>
         </div>
 

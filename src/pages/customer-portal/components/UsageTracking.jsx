@@ -4,91 +4,43 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import Icon from '../../../components/AppIcon';
 
 const UsageTracking = ({ usage, subscription }) => {
-  const [selectedMetric, setSelectedMetric] = useState('apiCalls');
+  const [selectedMetric, setSelectedMetric] = useState('credits');
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
 
-  // Mock usage history data
+  // Generate usage history from credit history
   const usageHistory = {
-    apiCalls: [
-      { date: '2024-01-01', value: 1250 },
-      { date: '2024-01-02', value: 1890 },
-      { date: '2024-01-03', value: 2100 },
-      { date: '2024-01-04', value: 1750 },
-      { date: '2024-01-05', value: 2300 },
-      { date: '2024-01-06', value: 1950 },
-      { date: '2024-01-07', value: 2450 },
-      { date: '2024-01-08', value: 2100 },
-      { date: '2024-01-09', value: 1850 },
-      { date: '2024-01-10', value: 2200 },
-      { date: '2024-01-11', value: 2500 },
-      { date: '2024-01-12', value: 2150 },
-      { date: '2024-01-13', value: 1900 },
-      { date: '2024-01-14', value: 2350 }
-    ],
-    storage: [
-      { date: '2024-01-01', value: 45.2 },
-      { date: '2024-01-02', value: 46.1 },
-      { date: '2024-01-03', value: 47.8 },
-      { date: '2024-01-04', value: 49.2 },
-      { date: '2024-01-05', value: 51.5 },
-      { date: '2024-01-06', value: 53.1 },
-      { date: '2024-01-07', value: 55.7 },
-      { date: '2024-01-08', value: 58.2 },
-      { date: '2024-01-09', value: 60.1 },
-      { date: '2024-01-10', value: 62.4 },
-      { date: '2024-01-11', value: 64.8 },
-      { date: '2024-01-12', value: 66.9 },
-      { date: '2024-01-13', value: 68.1 },
-      { date: '2024-01-14', value: 68.5 }
-    ],
-    users: [
-      { date: '2024-01-01', value: 5 },
-      { date: '2024-01-02', value: 5 },
-      { date: '2024-01-03', value: 6 },
-      { date: '2024-01-04', value: 6 },
-      { date: '2024-01-05', value: 7 },
-      { date: '2024-01-06', value: 7 },
-      { date: '2024-01-07', value: 7 },
-      { date: '2024-01-08', value: 8 },
-      { date: '2024-01-09', value: 8 },
-      { date: '2024-01-10', value: 8 },
-      { date: '2024-01-11', value: 8 },
-      { date: '2024-01-12', value: 8 },
-      { date: '2024-01-13', value: 8 },
-      { date: '2024-01-14', value: 8 }
-    ]
+    credits: (usage?.creditHistory || []).map(entry => ({
+      date: new Date(entry.created_at).toISOString().split('T')[0],
+      value: Math.abs(entry.delta),
+      type: entry.delta > 0 ? 'earned' : 'used'
+    })),
+    images: (usage?.creditHistory || [])
+      .filter(entry => entry.delta < 0) // Only show used credits (image generations)
+      .map(entry => ({
+        date: new Date(entry.created_at).toISOString().split('T')[0],
+        value: Math.abs(entry.delta)
+      }))
   };
 
   const metrics = [
     {
-      id: 'apiCalls',
-      name: 'API Calls',
-      icon: 'Zap',
+      id: 'credits',
+      name: 'Credits',
+      icon: 'Coins',
       color: '#3b82f6',
-      current: usage?.apiCalls?.current,
-      limit: usage?.apiCalls?.limit,
-      percentage: usage?.apiCalls?.percentage,
-      unit: 'calls'
+      current: usage?.credits?.current || 0,
+      used: usage?.credits?.used || 0,
+      total: usage?.credits?.total || 0,
+      unit: 'credits'
     },
     {
-      id: 'storage',
-      name: 'Storage',
-      icon: 'HardDrive',
+      id: 'images',
+      name: 'Images Generated',
+      icon: 'Image',
       color: '#f59e0b',
-      current: usage?.storage?.current,
-      limit: usage?.storage?.limit,
-      percentage: usage?.storage?.percentage,
-      unit: usage?.storage?.unit
-    },
-    {
-      id: 'users',
-      name: 'Users',
-      icon: 'Users',
-      color: '#10b981',
-      current: usage?.users?.current,
-      limit: usage?.users?.limit,
-      percentage: usage?.users?.percentage,
-      unit: 'users'
+      current: usage?.images?.generated || 0,
+      remaining: usage?.images?.remaining || 0,
+      unit: 'images'
     }
   ];
 
@@ -169,20 +121,29 @@ const UsageTracking = ({ usage, subscription }) => {
               <div className="mb-3">
                 <div className="flex items-end space-x-2">
                   <span className="text-2xl font-bold text-text-primary">
-                    {formatValue(metric?.current, metric)}
+                    {metric?.id === 'credits' ? metric?.current : metric?.current}
                   </span>
                   <span className="text-sm text-text-secondary">
-                    / {formatValue(metric?.limit, metric)}
+                    {metric?.id === 'credits' ? `/${metric?.total} credits` : ` ${metric?.unit}`}
                   </span>
                 </div>
                 <p className="text-sm text-text-secondary">
-                  {metric?.percentage?.toFixed(1)}% used
+                  {metric?.id === 'credits' 
+                    ? `${metric?.used} used` 
+                    : `${metric?.remaining} remaining`}
                 </p>
               </div>
               <div className="w-full bg-secondary-200 rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all duration-300 ${status?.bgColor}`}
-                  style={{ width: `${Math.min(metric?.percentage || 0, 100)}%` }}
+                  style={{ 
+                    width: `${Math.min(
+                      metric?.id === 'credits' 
+                        ? (metric?.used / Math.max(metric?.total, 1)) * 100
+                        : (metric?.current / Math.max(metric?.remaining + metric?.current, 1)) * 100, 
+                      100
+                    )}%` 
+                  }}
                 ></div>
               </div>
             </div>
